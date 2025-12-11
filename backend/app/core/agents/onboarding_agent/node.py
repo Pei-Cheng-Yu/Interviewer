@@ -11,7 +11,9 @@ async def extractor_node(state: InterviewState):
     
     extract_prompt = f"""
     You are an expert recruiter. Extract the candidate's profile from the resume below.
-    Also consider the Job Description to identify a list of 3 relevant skills.
+    You should consider the Job Description to identify a list of 3 skills that relevant to the Job Role.
+    Remember the skills should only be related to Job Role
+    For example, If job role is backend only, then the React shouldn't be identify as a skill for candidate
     
     RESUME:
     {state["raw_resume"]}

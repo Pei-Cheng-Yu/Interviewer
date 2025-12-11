@@ -42,6 +42,7 @@ def problem_extractor_node(state: InterviewState) -> ScoringState:
     }     
     
 async def accuracy_score_node(state: ScoringState) :
+    print("--- 💾 Scoring Accuracy ---")
     llm = get_llm()
     criteria = SCORING_CRITERIA["accuracy"]
 
@@ -63,6 +64,7 @@ async def accuracy_score_node(state: ScoringState) :
     }
     
 async def communication_score_node(state: ScoringState) :
+    print("--- 💾 Scoring Communication ---")
     llm = get_llm()
     criteria = SCORING_CRITERIA["communication"]
     
@@ -85,6 +87,7 @@ async def communication_score_node(state: ScoringState) :
     }
     
 async def completeness_score_node(state: ScoringState) :
+    print("--- 💾 Scoring Completeness ---")
     llm = get_llm()
     criteria = SCORING_CRITERIA["completeness"]
     
@@ -107,6 +110,7 @@ async def completeness_score_node(state: ScoringState) :
     }
     
 async def summarize_node(state: ScoringState) -> InterviewState:
+    print("--- 💾 Summarizing Score ---")
     idx = state["idx"]
     problem = state["problem"]
     
