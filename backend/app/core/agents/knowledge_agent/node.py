@@ -71,7 +71,8 @@ async def expert_query_node(problem: Problem):
     
     answer_llm = llm.with_structured_output(Reference_answer)
     reference_answer =await answer_llm.ainvoke(answer_prompt)
-    problem.reference_answer = reference_answer
-    
-    return {"problem_set": [problem]}
+    updated_problem = problem.model_copy(update={
+        "reference_answer": reference_answer
+    })
+    return {"problem_set": [updated_problem]}
     

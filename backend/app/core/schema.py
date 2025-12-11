@@ -1,5 +1,5 @@
 import operator
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from typing import Annotated, List, Literal, Optional
 from typing_extensions import TypedDict
 
@@ -20,6 +20,17 @@ class Reference_answer(BaseModel):
     reference_answer: str
     key_criteria: List[str] = Field(description="List of details the candidate MUST say.")
     
+class Grade(BaseModel):
+    accuracy_score: int = Field(description="1-10: Correctness of technical facts.")
+    communication_score: int = Field(description="1-10: Clarity, structure, and conciseness.")
+    completeness_score: int = Field(description="1-10: Coverage of key criteria and depth.")
+    
+    feedback: str = Field(description="Specific advice on how to improve.")
+    @computed_field
+    def final_score(self) -> float:
+        # Example weighting: Accuracy is king (50%), others are 25%
+        return (self.accuracy_score * 0.5) + (self.communication_score * 0.25) + (self.completeness_score * 0.25)
+    
 class Problem(BaseModel):
     id: int
     difficulty: Literal["easy", "medium", "hard"]
@@ -30,8 +41,7 @@ class Problem(BaseModel):
     
     reference_answer: Optional[Reference_answer] = Field(default=None, description="Leave blank for now")
     candidate_response: Optional[str] = Field(default=None, description="Filled by user later")
-    score: Optional[int] = Field(default=None, description="Filled by scorer later")
-    feedback: Optional[str] = Field(default=None, description="Filled by scorer later")
+    grade: Optional[Grade] = Field(default=None, description="Leave blank for now")
     
     
 class SearchQuery(BaseModel):

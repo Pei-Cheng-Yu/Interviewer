@@ -67,3 +67,11 @@ async def generate_questions_node(state: QuestionGenerationTask):
     problem.id = state['target_id']
     
     return {"problem_set": [problem]}
+
+
+def next_phase_node(state: InterviewState):
+    current_count = len(state["problem_set"])
+    total_limit = current_count*2
+    print(f"   📊 Questions Ready: {current_count}")
+    print(f"   🎯 Total Goal: {total_limit}")
+    return {"max_index": total_limit}
