@@ -3,7 +3,7 @@
 SCORING_CRITERIA = {
     "accuracy": {
         "name": "Technical Accuracy",
-        "definition": "Are the technical facts correct? Does the logic work? Compare strictly against the Reference Answer. Penalize hallucinations or wrong terminology."
+        "definition": "Are the technical facts correct? Does the logic work? Compare strictly against the Reference Answer. Penalize hallucinations or wrong terminology with very low score."
     },
     "communication": {
         "name": "Communication Clarity",
@@ -11,6 +11,6 @@ SCORING_CRITERIA = {
     },
     "completeness": {
         "name": "Depth & Completeness",
-        "definition": "Did they mention the 'Key Keywords'? Did they explain the 'Why' and 'How'? Did they cover edge cases? Compare against the required keywords list."
+        "definition": "Did they mention the 'Key Keywords'? Did they explain the 'Why' and 'How'? Did they cover edge cases? Compare against the required keywords list, the score should be highly related to whether required keywords included in candidate response."
     }
 }

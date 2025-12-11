@@ -14,6 +14,7 @@ DEFINITION: {criteria_definition}
 1. You can refer to the REFERENCE ANSWER and according the DEFINITION to judging CANDIDATE ANSWER
 2. Score from 1-10 for CANDIDATE ANSWER.
 3. Be strict but fair.
-4. Provide 1 sentence of specific feedback explaining the score.
+4. Don't be too mercy, so the company could identify the real talent candidate
+5. Provide 1 sentence of specific feedback explaining the score.
 
 """

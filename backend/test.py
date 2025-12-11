@@ -29,7 +29,7 @@ async def main():
     # 1. Mock Input
     initial_state = {
         "raw_resume": "I am Pei-Cheng. I know Python and React, have wrote some backend api for my shool's lab.",
-        "raw_jd": "Looking for a Full Stack Engineer.",
+        "raw_jd": "Looking for a Backend Engineer.",
         "problem_set": [], # Start empty
         "current_index": 0
     }
@@ -89,6 +89,7 @@ async def main():
     # 4. The Loop
     while True:
         # Check if interview ended
+        
         if "thank you" in ai_message.lower() or "finished" in ai_message.lower():
             print("\n🏁 Interview Finished.")
             break
@@ -96,7 +97,7 @@ async def main():
         # A. Simulate Candidate Thinking
         candidate_reply = await generate_candidate_response(
             ai_message, 
-            persona="A confident Junior Developer"
+            persona="A newbie on coding with some hallucinations, and will make some wrong answer"
         )
         print(f"👤 Candidate: {candidate_reply}")
         
@@ -115,11 +116,23 @@ async def main():
         # previous question is at index - 1 (because speak node looks at current, but logic incremented it)
         # Note: Depending on your exact logic implementation, you might need to adjust this index lookup
         scored_q = step_result["problem_set"][current_idx - 1]
-        print(f"   (DEBUG: Score for Q{scored_q.id}: {scored_q.grade})")
-        print(f"   (DEBUG: Response for Q{scored_q.id}: {scored_q.candidate_response})")
-        print(f"   (DEBUG: Ref for Q{scored_q.id}: {scored_q.reference_answer})")
+        print(f" ===================================== ")
+        print(f" =============== Score =============== ")
+        print(f"   Score for Q{scored_q.id}: ")
+        print(f"        accuracy_score: {scored_q.grade.accuracy_score}")
+        print(f"        communication_score: {scored_q.grade.communication_score}")
+        print(f"        completeness_score: {scored_q.grade.completeness_score}")
+        print(f"        Final_score: {scored_q.grade.final_score}")
+        print(f"   FeedBack for Q{scored_q.id}: {scored_q.grade.feedback}")
+        print(f" {scored_q.grade.feedback} ")
+        print(f" ===================================== ")
         
+        print(f"   Response for Q{scored_q.id}: {scored_q.candidate_response})")
+        print(f"   Ref for Q{scored_q.id}: {scored_q.reference_answer})")
         
+        print(f" ============================================= ")
+        print(f" =============== Next Question =============== ")
+        print(f" ============================================= ")
         # C. Get AI Response
         ai_message = step_result["messages"][-1].content
         print(f"🤖 AI: {ai_message}")

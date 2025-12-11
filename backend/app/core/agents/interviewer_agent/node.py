@@ -51,7 +51,7 @@ def next_stage(state: InterviewState):
     print("--- Processing next stage ---")
     
     idx = state["current_index"]
-    if idx < state["max_index"]:
+    if idx < 3:# state["max_index"]:
         return "speak_node"
     
     return "finish_speak_node"
