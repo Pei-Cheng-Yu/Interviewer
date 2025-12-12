@@ -5,38 +5,47 @@ from app.core.agents.interviewer_agent.node import (
     speak_node,
     save_response_node,
     finish_speak_node,
-    next_stage
+    next_stage,
+    waiting_question_node,
+    get_back_ground_node
 )
-from app.core.agents.scoring_agent.agent import build_scoring_graph
-from langgraph.checkpoint.memory import MemorySaver
 
-def build_interviewer_graph():
+from langgraph.checkpoint.base import BaseCheckpointSaver
+
+def build_interviewer_graph(checkpointer: BaseCheckpointSaver = None):
     workflow = StateGraph(InterviewState)
     workflow.add_node("speak_node", speak_node)
     workflow.add_node("save_response_node", save_response_node)
     workflow.add_node("finish_speak_node", finish_speak_node)
-    scoring_graph = build_scoring_graph()
-    workflow.add_node("scoring_node", scoring_graph)
+    workflow.add_node("waiting_question_node", waiting_question_node)
+    workflow.add_node("start_get_back_ground_node", get_back_ground_node)
+    workflow.add_node("get_back_ground_node", get_back_ground_node)
+  
+    workflow.add_edge(START, "start_get_back_ground_node")
     workflow.add_conditional_edges(
-        START,
+        "start_get_back_ground_node",
         route_start,
         {
             "speak_node": "speak_node",
-            "save_response_node": "save_response_node"
+            "save_response_node": "save_response_node",
+            "__end__": END
         }
     )
+    workflow.add_edge("save_response_node", "get_back_ground_node")
+   
     
     workflow.add_conditional_edges(
         "save_response_node",
         next_stage,
         {
             "speak_node": "speak_node",
-            "finish_speak_node": "finish_speak_node"
+            "finish_speak_node": "finish_speak_node",
+            "waiting_question_node": "waiting_question_node"
         }
     )
     
-    workflow.add_edge("save_response_node","scoring_node")
     workflow.add_edge("speak_node", END)
     workflow.add_edge("finish_speak_node", END)
-    memory = MemorySaver()
-    return workflow.compile(checkpointer=memory)
+    workflow.add_edge("waiting_question_node", END)
+    
+    return workflow.compile(checkpointer=checkpointer)

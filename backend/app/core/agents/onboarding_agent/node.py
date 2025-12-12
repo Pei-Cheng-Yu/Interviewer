@@ -2,6 +2,7 @@ from app.core.llm import get_llm
 from app.core.state import InterviewState
 from app.core.schema import Candidate, Problem, QuestionGenerationTask
 from langgraph.types import Send
+from app.core.store import InterviewStore
 
 async def extractor_node(state: InterviewState):
     print("--- 🚀 Starting Extractoring Node ---")
@@ -74,6 +75,8 @@ async def generate_questions_node(state: QuestionGenerationTask):
 def next_phase_node(state: InterviewState):
     current_count = len(state["problem_set"])
     total_limit = current_count*2
+    for problem in  state["problem_set"]:
+        InterviewStore.save_problem(problem)
     print(f"   📊 Questions Ready: {current_count}")
     print(f"   🎯 Total Goal: {total_limit}")
-    return {"max_index": total_limit}
+    return {"max_index": total_limit - 1, "ready_question_index": current_count-1}
