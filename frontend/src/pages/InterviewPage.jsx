@@ -61,7 +61,7 @@ export default function InterviewPage() {
     (res) => {
       setStatus(res.status);
       setQuestionText(res.question_text || "");
-      setQuestionAudioUrl(res.question_audio_url || null);
+      setQuestionAudioUrl(normalizeAudioUrl(res.question_audio_url));
       if (res.status === "completed") {
         nav(`/review/${sessionId}`, { replace: true });
       }
