@@ -93,6 +93,7 @@ class AnswerResponse(BaseModel):
 class InterviewHistoryItem(BaseModel):
     session_id: str
     status: str
+    job_title: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -422,6 +423,7 @@ async def list_interviews(user: User = Depends(get_current_user)):
                 InterviewHistoryItem(
                     session_id=s.id,
                     status=getattr(s, "status", "active"),
+                    job_title=getattr(s, "job_title", None),
                     created_at=getattr(s, "created_at", None),
                     updated_at=getattr(s, "updated_at", None),
                 )
