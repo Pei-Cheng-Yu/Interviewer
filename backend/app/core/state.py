@@ -10,6 +10,7 @@ def keep_max(old: int, new: int) -> int:
     return max(old, new)
 
 class InterviewState(MessagesState):
+    session_id: Optional[str] = None
     raw_resume: str
     raw_jd: str
     candidate: Optional[Candidate] = None
@@ -24,9 +25,21 @@ class InterviewState(MessagesState):
 
     
 class BackGroundState(TypedDict):
+    session_id: str
     problem_set: Annotated[List[Problem], reduce_problems]
     current_index: int = 0
     generate_target_index: int = 0
     research_target_index: int = 0
     scoring_index: int = 0
+
+   
     
+class ScoringState(TypedDict):
+    session_id: str
+    interaction_id: Optional[int]     # DB PK id for InterviewInteraction
+    problem: Optional[Problem]
+
+    accuracy_score: Optional[int]
+    communication_score: Optional[int]
+    completeness_score: Optional[int]
+    feedbacks: Annotated[List[str], operator.add]
