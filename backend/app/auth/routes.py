@@ -1,3 +1,5 @@
+import os
+
 from app.auth.protected import get_current_user
 from app.db.models.user import User
 from app.db.session import get_db
@@ -23,6 +25,7 @@ class TokenResponse(BaseModel):
 
 
 router = APIRouter(tags=["auth"])
+is_prod = os.getenv("ENV") == "prod"
 
 
 @router.post("/signup", status_code=201)
@@ -66,8 +69,8 @@ async def login(
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,  # True in HTTPS production
-        samesite="lax",  # REQUIRED for SSE
+        secure=is_prod,  # ✅ True on Cloud Run HTTPS
+        samesite="none" if is_prod else "lax",
         max_age=60 * 60 * 12,
         path="/",
     )

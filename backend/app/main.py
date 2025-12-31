@@ -1,3 +1,5 @@
+import os
+
 import uvicorn
 from app.auth import routes as auth
 from app.routes import interviews_api
@@ -10,9 +12,10 @@ app = FastAPI()
 
 # --- CORS Configuration ---
 # Allow requests from the frontend (React/Vite)
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5174"],  # Allow all origins for development
+    allow_origins=allowed_origins,  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

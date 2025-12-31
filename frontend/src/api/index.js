@@ -1,8 +1,12 @@
 import axios from "axios";
 export const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8002";
+
+const BASE = API_BASE.replace(/\/+$/, ""); // remove trailing /
+const AXIOS_BASE = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  withCredentials: true, // ⭐ IMPORTANT: send cookies
+  baseURL: AXIOS_BASE,
+  withCredentials: true,
 });
 
 // Optional: keep header token support (for non-SSE APIs)

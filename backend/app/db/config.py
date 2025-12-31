@@ -7,7 +7,10 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
-    # Default values compatible with docker-compose
+    # Optional: allow overriding everything with a single URL (best for Cloud Run)
+    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
+
+    # Defaults for local docker-compose
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "user")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "pass")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "db")
@@ -15,9 +18,16 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
 
     @property
-    def DATABASE_URL(self) -> str:
-        # ✅ USE 'postgresql+asyncpg' FOR FASTAPI
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    def db_url(self) -> str:
+        # 1) Cloud Run / production: use full DATABASE_URL if provided
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+
+        # 2) Local compose fallback
+        return (
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
 
 
 settings = Settings()
