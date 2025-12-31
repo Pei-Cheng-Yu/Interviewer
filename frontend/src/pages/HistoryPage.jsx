@@ -70,6 +70,7 @@ export default function HistoryPage() {
 
         {completedItems.map((s) => {
           const id = s?.id || s?.session_id;
+          const title = s?.job_title;
           return (
             <div
               key={id}
@@ -78,7 +79,7 @@ export default function HistoryPage() {
               role="button"
               tabIndex={0}
             >
-              <div className="listTitle">{id}</div>
+              <div className="listTitle">{title}</div>
               <div className="listMeta">
                 <span className="badgeDone">completed</span>
                 {s.created_at ? (
