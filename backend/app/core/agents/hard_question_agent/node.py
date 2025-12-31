@@ -1,15 +1,17 @@
 import os
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from langchain_community.utilities import GoogleSerperAPIWrapper
 
+from app.core.agents.hard_question_agent.prompt import (
+    HARD_SCENARIO_PROMPT,
+    QUERY_PROMPT,
+)
 from app.core.llm import get_llm
-from app.core.agents.hard_question_agent.prompt import HARD_SCENARIO_PROMPT, QUERY_PROMPT
-from app.core.schema import SearchQuery, Reference_answer
+from app.core.schema import ReferenceAnswer, SearchQuery
 from app.core.state import BackGroundState
-
-from app.db.session import AsyncSessionLocal
 from app.db.repositories.interview_repo import InterviewRepo
+from app.db.session import AsyncSessionLocal
+from dotenv import load_dotenv
+from langchain_community.utilities import GoogleSerperAPIWrapper
+from pydantic import BaseModel, Field
 
 load_dotenv()
 os.environ["SERPER_API_KEY"] = os.getenv("SERPER_API_KEY")
@@ -17,37 +19,37 @@ search = GoogleSerperAPIWrapper()
 
 
 class HardQuestionOutput(BaseModel):
-    scenario_content: str = Field(description="The detailed engineering scenario and question to ask the candidate.")
-    technical_focus: str = Field(description="The specific sub-concept being tested (e.g., 'Database Locking').")
+    scenario_content: str = Field(
+        description="The detailed engineering scenario and question to ask the candidate."
+    )
+    technical_focus: str = Field(
+        description="The specific sub-concept being tested (e.g., 'Database Locking')."
+    )
 
 
 async def index_checker(state: BackGroundState):
     session_id = state["session_id"]
-    base_idx = state.get("generate_target_index", 0)
-    max_total = state.get("max_index", 6) + 1  # total allowed = 2N
 
     async with AsyncSessionLocal() as db:
         repo = InterviewRepo(db)
 
-        # Total cap reached?
+        session = await repo.get_session(session_id)
+        max_total = (session.max_index + 1) if session.max_index is not None else 7
+
         total = await repo.count_interactions(session_id)
         if total >= max_total:
             return "__end__"
 
-        # Base row exists + graded?
-        base_row = await repo.get_by_order(session_id, base_idx)
-        if not base_row:
-            return "__end__"
-        if not base_row.user_answer_text:
-            return "__end__"
-        if base_row.grade_data is None:
+        base_idx = await repo.get_next_base_idx_for_hard(session_id)
+        print(f"auto-picked base_idx: {base_idx}")
+
+        if base_idx is None:
             return "__end__"
 
-        # Already generated hard for this base?
-        if await repo.hard_exists_for_base(session_id, base_idx):
-            return "__end__"
+        # put it into state so generate_hard_node knows which parent to use
+        state["generate_target_index"] = int(base_idx)
+        return "generate_hard_node"
 
-    return "generate_hard_node"
 
 async def generate_hard_node(state: BackGroundState):
     print("--- 🧠 Generating Hard Scenario ---")
@@ -80,9 +82,12 @@ async def generate_hard_node(state: BackGroundState):
             question_content=result.scenario_content,
             reference_data={
                 "meta": {
-                    "topic": (base_row.reference_data or {}).get("meta", {}).get("topic", "general"),
+                    "topic": (base_row.reference_data or {})
+                    .get("meta", {})
+                    .get("topic", "general"),
                     "competency": result.technical_focus,
                     "difficulty": "hard",
+                    "parent_order_index": base_idx,
                 }
             },
         )
@@ -116,7 +121,9 @@ async def expert_query_node(state: BackGroundState):
     query_prompt = QUERY_PROMPT.format(
         content=row.question_content,
         topic=(row.reference_data or {}).get("meta", {}).get("topic", "general"),
-        competency=(row.reference_data or {}).get("meta", {}).get("competency", "general"),
+        competency=(row.reference_data or {})
+        .get("meta", {})
+        .get("competency", "general"),
     )
 
     search_query = await llm.with_structured_output(SearchQuery).ainvoke(query_prompt)
@@ -134,7 +141,9 @@ INSTRUCTIONS:
 2. key_criteria: List 3 details the candidate MUST say.
 """.strip()
 
-    reference_answer = await llm.with_structured_output(Reference_answer).ainvoke(answer_prompt)
+    reference_answer = await llm.with_structured_output(ReferenceAnswer).ainvoke(
+        answer_prompt
+    )
 
     # Save reference into DB
     async with AsyncSessionLocal() as db:

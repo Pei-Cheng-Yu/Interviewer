@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from app.core.llm import get_llm
-from app.core.state import InterviewState
 from app.core.schema import Candidate, Problem, QuestionGenerationTask
+from app.core.state import InterviewState
+from app.db.repositories.interview_repo import InterviewRepo
+from app.db.session import AsyncSessionLocal
 from langgraph.types import Send
 
-from app.db.session import AsyncSessionLocal
-from app.db.repositories.interview_repo import InterviewRepo
+from .utils import get_resume_analysis_message
 
 
 async def extractor_node(state: InterviewState):
@@ -18,16 +19,31 @@ async def extractor_node(state: InterviewState):
 You are an expert recruiter. Extract the candidate's profile from the resume below.
 You should consider the Job Description to identify a list of 3 skills that relevant to the Job Role.
 Remember the skills should only be related to Job Role
-For example, If job role is backend only, then the React shouldn't be identify as a skill for candidate
+For example, If job role is backend only, then React shouldn't be identified as a skill.
 
-RESUME:
-{state["raw_resume"]}
+RESUME TEXT version:
+{state.get("raw_resume", "")}
 
 JOB DESCRIPTION:
-{state["raw_jd"]}
+{state.get("raw_jd", "")}
 """.strip()
 
-    candidate_obj = await extractor_llm.ainvoke(extract_prompt)
+    # ✅ Gemini needs at least one "content" message -> HumanMessage
+    messages = [extract_prompt]
+
+    pdf_source = state.get("resume_pdf_input")
+    if pdf_source:
+        pdf_msg = get_resume_analysis_message(pdf_source)
+        # must be a BaseMessage (HumanMessage), not str
+        if pdf_msg:
+            messages.append(pdf_msg)
+
+    session_id = state.get("session_id")
+    candidate_obj = await extractor_llm.ainvoke(messages)
+    async with AsyncSessionLocal() as db:
+        repo = InterviewRepo(db)
+        await repo.set_session_job_title(session_id, candidate_obj.apply_role)
+        await db.commit()
     print(f"✅ Extracted: {candidate_obj.name} applying for {candidate_obj.apply_role}")
     return {"candidate": candidate_obj}
 
@@ -43,13 +59,16 @@ def initiate_generate_questions(state: InterviewState):
 
     # Use 0-based order_index to match your current_index default = 0
     return [
-        Send("generate_questions_node", {
-            "session_id": session_id,
-            "competency": skill,
-            "target_id": i,  # 0-based index
-            "candidate_name": candidate.name,
-            "candidate_skills": candidate.skills,
-        })
+        Send(
+            "generate_questions_node",
+            {
+                "session_id": session_id,
+                "competency": skill,
+                "target_id": i,  # 0-based index
+                "candidate_name": candidate.name,
+                "candidate_skills": candidate.skills,
+            },
+        )
         for i, skill in enumerate(candidate.skills)
     ]
 
@@ -108,20 +127,22 @@ async def next_phase_node(state: InterviewState):
     """
     Once initial questions are written to DB, set indices based on DB max index.
     """
+
     session_id = state["session_id"]
 
     async with AsyncSessionLocal() as db:
         repo = InterviewRepo(db)
-        max_idx = await repo.get_max_order_index(session_id)  # -1 if none
+        max_idx = await repo.get_max_order_index(session_id)  # last existing index
+        current_count = max_idx + 1 if max_idx >= 0 else 0
+        total_limit = current_count * 2
+        max_index = total_limit - 1
+
+        await repo.set_session_max_index(session_id, max_index)  # ✅ persist
         await db.commit()
-
-    current_count = max_idx + 1 if max_idx >= 0 else 0
-    total_limit = current_count * 2
-
     print(f"   📊 Questions Ready: {current_count}")
     print(f"   🎯 Total Goal: {total_limit}")
 
     return {
-        "max_index": total_limit - 1,
-        "ready_question_index": max_idx,  # last question index available
+        "max_index": max_index,
+        "ready_question_index": max_idx,
     }

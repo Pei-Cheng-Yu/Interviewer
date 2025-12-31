@@ -1,4 +1,3 @@
-
 HARD_SCENARIO_PROMPT = """
 You are a Principal Software Architect conducting a high-level system design interview.
 The candidate successfully answered a basic question about **{topic}**.
@@ -31,12 +30,12 @@ Generate ONLY the scenario question and the technical focus. Do NOT include the 
 QUERY_PROMPT = """
     You are a Tech Lead preparing an query for web-searching for a interview answer.
     Your goal is to generate a well-structured query for use in retrieval and / or web-search
-    
+
     below is the original interview question:
     QUESTION: "{content}"
     TOPIC: {topic}
     COMPETENCY: {competency}
-    
+
     Task:
     1. First, analyze the Question information
     2. Pay particular attention to the COMPETENCY

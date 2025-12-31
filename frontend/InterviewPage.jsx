@@ -112,9 +112,18 @@ export default function InterviewPage() {
         <p>Loading...</p>
       ) : (
         <>
-          <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12, marginTop: 16 }}>
+          <div
+            style={{
+              padding: 16,
+              border: "1px solid #ddd",
+              borderRadius: 12,
+              marginTop: 16,
+            }}
+          >
             <div style={{ opacity: 0.7, marginBottom: 8 }}>Question</div>
-            <div style={{ fontSize: 18, lineHeight: 1.5 }}>{question || "Press Start to begin."}</div>
+            <div style={{ fontSize: 18, lineHeight: 1.5 }}>
+              {question || "Press Start to begin."}
+            </div>
           </div>
 
           <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
@@ -132,12 +141,22 @@ export default function InterviewPage() {
               </button>
             )}
 
-            <button onClick={submitAnswer} disabled={busy || !transcript.trim()}>
+            <button
+              onClick={submitAnswer}
+              disabled={busy || !transcript.trim()}
+            >
               Submit Answer
             </button>
           </div>
 
-          <div style={{ marginTop: 16, padding: 16, border: "1px solid #eee", borderRadius: 12 }}>
+          <div
+            style={{
+              marginTop: 16,
+              padding: 16,
+              border: "1px solid #eee",
+              borderRadius: 12,
+            }}
+          >
             <div style={{ opacity: 0.7, marginBottom: 8 }}>
               Transcript {listening ? "(listening...)" : ""}
             </div>

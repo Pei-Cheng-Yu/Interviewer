@@ -9,8 +9,8 @@ export const sendMessageToBackend = async (userMessage) => {
       // 假設未來的 Agent 會針對你的輸入做回應
       resolve({
         reply: `(模擬回應) 我收到了你的訊息：「${userMessage}」。我是 BodyBuilder AI 助手，請問有什麼我可以幫你的？`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-    }, 1000); 
+    }, 1000);
   });
 };

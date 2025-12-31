@@ -35,7 +35,11 @@ export default function OnboardPage() {
 
       <div style={{ marginTop: 16 }}>
         <label>Target role (optional)</label>
-        <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g., Backend Intern" />
+        <input
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="e.g., Backend Intern"
+        />
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -60,7 +64,9 @@ export default function OnboardPage() {
         <button onClick={() => fileRef.current?.click()} disabled={loading}>
           Upload Resume (optional)
         </button>
-        {resumeFile && <span style={{ marginLeft: 12 }}>{resumeFile.name}</span>}
+        {resumeFile && (
+          <span style={{ marginLeft: 12 }}>{resumeFile.name}</span>
+        )}
       </div>
 
       <div style={{ marginTop: 24 }}>

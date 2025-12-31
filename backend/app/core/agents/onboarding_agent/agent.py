@@ -1,11 +1,12 @@
-from langgraph.graph import END, START, StateGraph
-from app.core.state import InterviewState
 from app.core.agents.onboarding_agent.node import (
     extractor_node,
-    initiate_generate_questions,
     generate_questions_node,
+    initiate_generate_questions,
     next_phase_node,
 )
+from app.core.state import InterviewState
+from langgraph.graph import END, START, StateGraph
+
 
 def build_onboarding_graph():
     """
@@ -18,7 +19,7 @@ def build_onboarding_graph():
 
     workflow.add_node("extractor_node", extractor_node)
     workflow.add_node("generate_questions_node", generate_questions_node)
-    workflow.add_node("join_node", lambda state: {})   # <-- runs once after fan-out
+    workflow.add_node("join_node", lambda state: {})  # <-- runs once after fan-out
     workflow.add_node("next_phase_node", next_phase_node)
 
     workflow.add_edge(START, "extractor_node")

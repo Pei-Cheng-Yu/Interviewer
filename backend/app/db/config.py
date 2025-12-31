@@ -1,8 +1,11 @@
 import os
-from pydantic_settings import BaseSettings
+
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 load_dotenv()
+
+
 class Settings(BaseSettings):
     # Default values compatible with docker-compose
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "user")
@@ -15,5 +18,6 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         # ✅ USE 'postgresql+asyncpg' FOR FASTAPI
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
 
 settings = Settings()

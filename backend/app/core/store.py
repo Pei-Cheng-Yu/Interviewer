@@ -1,10 +1,12 @@
 # app/core/store.py
 from typing import Dict
-from app.core.schema import Problem, Grade
+
+from app.core.schema import Problem
+
 
 class InterviewStore:
     _data: Dict[int, Problem] = {}
-    
+
     @classmethod
     def save_problem(cls, problem: Problem):
         # Acts like an "UPSERT"
@@ -15,7 +17,7 @@ class InterviewStore:
             cls._data[problem.id] = existing.model_copy(update=update_dict)
         else:
             cls._data[problem.id] = problem
-            
+
     @classmethod
     def get_problem(cls, p_id: int) -> Problem:
         return cls._data.get(p_id)

@@ -50,12 +50,12 @@ __pycache__/
 *.pyo
 .venv/
 venv/
-
+.venv-win/
 ./backend/agents/agent_test
 #local db
 *.db
 
-
+backend/media/
 deploy.sh
 #
 */env.yaml

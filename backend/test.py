@@ -1,36 +1,37 @@
 import asyncio
+
+from app.core.agents.hard_question_agent.agent import build_hard_question_graph
+from app.core.agents.interviewer_agent.agent import build_interviewer_graph
+from app.core.agents.knowledge_agent.agent import build_knowledge_graph
+from app.core.agents.onboarding_agent.agent import build_onboarding_graph
+from app.core.agents.scoring_agent.agent import build_scoring_graph
+from app.core.llm import get_llm
+from app.db.models import User
+from app.db.repositories.interview_repo import InterviewRepo
+from app.db.session import AsyncSessionLocal
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
-
-from app.core.llm import get_llm
-from app.core.state import InterviewState
-from app.db.session import AsyncSessionLocal
-from app.db.repositories.interview_repo import InterviewRepo
-
-from app.core.agents.onboarding_agent.agent import build_onboarding_graph
-from app.core.agents.knowledge_agent.agent import build_knowledge_graph
-from app.core.agents.interviewer_agent.agent import build_interviewer_graph
-from app.core.agents.scoring_agent.agent import build_scoring_graph
-from app.core.agents.hard_question_agent.agent import build_hard_question_graph
-
 from sqlalchemy import select
-from app.db.models import User
 
 USER_ID = 1  # make sure this exists in DB
+
 
 async def ensure_test_user(user_id: int):
     async with AsyncSessionLocal() as db:
         exists = await db.scalar(select(User.id).where(User.id == user_id))
         if exists:
             return
-        db.add(User(
-            id=user_id,
-            email=f"test{user_id}@example.com",
-            hashed_password="not-a-real-hash",
-            full_name="Test User",
-        ))
+        db.add(
+            User(
+                id=user_id,
+                email=f"test{user_id}@example.com",
+                hashed_password="not-a-real-hash",
+                full_name="Test User",
+            )
+        )
         await db.commit()
-        
+
+
 async def generate_candidate_response(question_text: str, persona: str) -> str:
     llm = get_llm()
     prompt = f"""
@@ -87,7 +88,9 @@ async def main():
     prepared_state = await knowledge_graph.ainvoke(prepared_state)
 
     print("\n✅ Prep complete.")
-    print("NOTE: reference_answer/key_criteria are stored in DB (knowledge node returns {}).")
+    print(
+        "NOTE: reference_answer/key_criteria are stored in DB (knowledge node returns {})."
+    )
 
     # ---------------------------------------------------------
     # 2) Phase 2: Interviewer loop (with checkpoint memory)
@@ -101,7 +104,9 @@ async def main():
     # hard question graph (DB-first hard agent you pasted)
     hard_app = build_hard_question_graph()
 
-    thread_config = {"configurable": {"thread_id": "test_session_1", "user_id": USER_ID}}
+    thread_config = {
+        "configurable": {"thread_id": "test_session_1", "user_id": USER_ID}
+    }
 
     # Seed the interview graph state into memory
     interview_app.update_state(thread_config, prepared_state)
@@ -117,7 +122,7 @@ async def main():
         # Candidate answer
         candidate_reply = await generate_candidate_response(
             ai_msg,
-            persona="A junior backend developer who is nervous but knows Python basics"
+            persona="A junior backend developer who is nervous but knows Python basics",
         )
         print(f"\n👤 Candidate: {candidate_reply}")
 
@@ -133,19 +138,24 @@ async def main():
 
         # Trigger scoring (DB-first): grade the next answered-but-ungraded item
         print("   [Background] 🧾 Triggering scoring...")
-        await scoring_app.ainvoke({"session_id": session_id}, config={"configurable": {"thread_id": "score_1"}})
+        await scoring_app.ainvoke(
+            {"session_id": session_id},
+            config={"configurable": {"thread_id": "score_1"}},
+        )
 
         # Trigger hard question generation (optional)
         # Your hard agent's index_checker depends on generate_target_index/scoring_index/max_index.
         # For a simple test: try generating exactly one hard question after each scoring.
         print("   [Background] 🧠 Triggering hard-question generation...")
-        await hard_app.ainvoke({
-            "session_id": session_id,
-            "generate_target_index": state.get("generate_target_index", 0),
-            "research_target_index": state.get("research_target_index", None),
-            "scoring_index": state.get("scoring_index", 0),
-            "max_index": state.get("max_index", 6),
-        })
+        await hard_app.ainvoke(
+            {
+                "session_id": session_id,
+                "generate_target_index": state.get("generate_target_index", 0),
+                "research_target_index": state.get("research_target_index", None),
+                "scoring_index": state.get("scoring_index", 0),
+                "max_index": state.get("max_index", 6),
+            }
+        )
 
         # Print interviewer output
         ai_msg = step["messages"][-1].content
@@ -159,7 +169,9 @@ async def main():
                 ready_idx = await db_max_index(session_id)
                 curr = state.get("current_index", 0)
                 if ready_idx >= curr:
-                    print(f"\n   [System] Ready! (DB max idx {ready_idx} >= current {curr})")
+                    print(
+                        f"\n   [System] Ready! (DB max idx {ready_idx} >= current {curr})"
+                    )
                     break
                 print(".", end="", flush=True)
                 await asyncio.sleep(1)

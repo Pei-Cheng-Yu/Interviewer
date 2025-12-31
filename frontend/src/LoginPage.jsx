@@ -18,7 +18,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      navigate("/plan", { replace: true });
+      navigate("/history", { replace: true });
     } catch {
       alert("Login failed");
     }

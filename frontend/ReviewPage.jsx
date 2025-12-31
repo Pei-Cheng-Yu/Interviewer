@@ -15,7 +15,9 @@ export default function ReviewPage() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
       <h1>Interview Review</h1>
-      <p><b>Overall score:</b> {data.overall_score}</p>
+      <p>
+        <b>Overall score:</b> {data.overall_score}
+      </p>
 
       <h3>Feedback</h3>
       <div style={{ whiteSpace: "pre-wrap" }}>{data.feedback}</div>
