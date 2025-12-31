@@ -37,7 +37,7 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
     new_user = User(
         username=data.username,
         email=data.email,
-        hash_password=hash_password(data.password),
+        hashed_password=hash_password(data.password),
     )
     db.add(new_user)
     await db.commit()
@@ -56,7 +56,7 @@ async def login(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(form.password, user.hash_password):
+    if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token({"sub": str(user.id)})

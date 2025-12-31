@@ -1,19 +1,17 @@
 import asyncio
-from sqlalchemy import select, func, cast, Integer
+
+from app.core.agents.hard_question_agent.agent import build_hard_question_graph
+from app.core.agents.interviewer_agent.agent import build_interviewer_graph
+from app.core.agents.knowledge_agent.agent import build_knowledge_graph  # optional
+from app.core.agents.onboarding_agent.agent import build_onboarding_graph
+from app.core.agents.scoring_agent.agent import build_scoring_graph
+from app.core.llm import get_llm
+from app.db.models import InterviewInteraction, User
+from app.db.repositories.interview_repo import InterviewRepo
+from app.db.session import AsyncSessionLocal
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
-
-from app.core.llm import get_llm
-from app.core.agents.onboarding_agent.agent import build_onboarding_graph
-from app.core.agents.knowledge_agent.agent import build_knowledge_graph  # optional
-from app.core.agents.interviewer_agent.agent import build_interviewer_graph
-from app.core.agents.scoring_agent.agent import build_scoring_graph
-from app.core.agents.hard_question_agent.agent import build_hard_question_graph
-
-from app.db.session import AsyncSessionLocal
-from app.db.repositories.interview_repo import InterviewRepo
-from app.db.models import User, InterviewInteraction
-
+from sqlalchemy import Integer, cast, func, select
 
 USER_ID = 1
 
@@ -70,25 +68,31 @@ async def db_counts(session_id: str) -> dict:
 
     async with AsyncSessionLocal() as db:
         total = await db.scalar(
-            select(func.count()).select_from(InterviewInteraction).where(
-                InterviewInteraction.session_id == session_id
-            )
+            select(func.count())
+            .select_from(InterviewInteraction)
+            .where(InterviewInteraction.session_id == session_id)
         )
         unanswered = await db.scalar(
-            select(func.count()).select_from(InterviewInteraction).where(
+            select(func.count())
+            .select_from(InterviewInteraction)
+            .where(
                 InterviewInteraction.session_id == session_id,
                 InterviewInteraction.user_answer_text.is_(None),
             )
         )
         ungraded_answered = await db.scalar(
-            select(func.count()).select_from(InterviewInteraction).where(
+            select(func.count())
+            .select_from(InterviewInteraction)
+            .where(
                 InterviewInteraction.session_id == session_id,
                 InterviewInteraction.user_answer_text.is_not(None),
                 InterviewInteraction.grade_data.is_(None),
             )
         )
         hard_total = await db.scalar(
-            select(func.count()).select_from(InterviewInteraction).where(
+            select(func.count())
+            .select_from(InterviewInteraction)
+            .where(
                 InterviewInteraction.session_id == session_id,
                 meta["difficulty"].as_string() == "hard",
             )
@@ -112,7 +116,9 @@ async def hard_exists_for_base(session_id: str, base_idx: int) -> bool:
     meta = InterviewInteraction.reference_data["meta"]
     async with AsyncSessionLocal() as db:
         n = await db.scalar(
-            select(func.count()).select_from(InterviewInteraction).where(
+            select(func.count())
+            .select_from(InterviewInteraction)
+            .where(
                 InterviewInteraction.session_id == session_id,
                 meta["difficulty"].as_string() == "hard",
                 cast(meta["parent_order_index"].as_string(), Integer) == base_idx,
@@ -177,15 +183,19 @@ async def background_worker(
         counts = await db_counts(session_id)
         if counts["total"] < max_total and base_ptr < base_count:
             try:
-                if await base_is_graded(session_id, base_ptr) and not await hard_exists_for_base(session_id, base_ptr):
+                if await base_is_graded(
+                    session_id, base_ptr
+                ) and not await hard_exists_for_base(session_id, base_ptr):
                     # One hard generation attempt for this base
-                    await hard_app.ainvoke({
-                        "session_id": session_id,
-                        "generate_target_index": base_ptr,
-                        "research_target_index": None,
-                        "scoring_index": 999999,  # ignored if DB-gated in your hard agent
-                        "max_index": max_total - 1,
-                    })
+                    await hard_app.ainvoke(
+                        {
+                            "session_id": session_id,
+                            "generate_target_index": base_ptr,
+                            "research_target_index": None,
+                            "scoring_index": 999999,  # ignored if DB-gated in your hard agent
+                            "max_index": max_total - 1,
+                        }
+                    )
 
                     # Optionally fill reference for newly created hard questions
                     if knowledge_app and knowledge_state:
@@ -245,13 +255,17 @@ async def main():
     counts = await db_counts(session_id)
     base_count = counts["total"]
     max_total = base_count * 2
-    print(f"\n✅ Prep complete. DB has {base_count} base interactions. Target total={max_total}.\n")
+    print(
+        f"\n✅ Prep complete. DB has {base_count} base interactions. Target total={max_total}.\n"
+    )
 
     # Phase 2: Interviewer (consumer) + background worker (producer)
     shared_memory = MemorySaver()
     interview_app = build_interviewer_graph(checkpointer=shared_memory)
 
-    thread_config = {"configurable": {"thread_id": "test_interview", "user_id": USER_ID}}
+    thread_config = {
+        "configurable": {"thread_id": "test_interview", "user_id": USER_ID}
+    }
     interview_app.update_state(thread_config, prepared_state)
 
     # Start background worker (DO NOT await)
@@ -290,7 +304,9 @@ async def main():
                     break
                 c = await db_counts(session_id)
                 if c["total"] >= max_total and c["unanswered"] == 0:
-                    print("\n🏁 Reached target and no unanswered questions left. Ending.")
+                    print(
+                        "\n🏁 Reached target and no unanswered questions left. Ending."
+                    )
                     bg_task.cancel()
                     try:
                         await bg_task
@@ -306,7 +322,8 @@ async def main():
 
         # Candidate answers
         candidate_reply = await generate_candidate_response(
-            ai_msg, persona="A junior backend dev who is nervous but knows Python basics"
+            ai_msg,
+            persona="A junior backend dev who is nervous but knows Python basics",
         )
         print(f"\n👤 Candidate: {candidate_reply}")
 
@@ -323,7 +340,9 @@ async def main():
 
         # Debug stats (optional)
         c = await db_counts(session_id)
-        print(f"   [DB] total={c['total']} unanswered={c['unanswered']} ungraded_answered={c['ungraded_answered']} hard_total={c['hard_total']}")
+        print(
+            f"   [DB] total={c['total']} unanswered={c['unanswered']} ungraded_answered={c['ungraded_answered']} hard_total={c['hard_total']}"
+        )
 
         # End condition if we've reached 2N and nothing left unanswered
         if c["total"] >= max_total and c["unanswered"] == 0:

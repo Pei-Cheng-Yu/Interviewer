@@ -1,11 +1,13 @@
 # backend/app/core/agents/knowledge_agent/graph.py
 
-from langgraph.graph import END, START, StateGraph
-from app.core.state import InterviewState
 from app.core.agents.knowledge_agent.node import (
-    initiate_expert_query,
     expert_query_node,
+    initiate_expert_query,
 )
+from app.core.state import InterviewState
+from langgraph.graph import END, START, StateGraph
+
+
 def build_knowledge_graph():
     workflow = StateGraph(InterviewState)
     workflow.add_node("expert_query_node", expert_query_node)
@@ -14,7 +16,7 @@ def build_knowledge_graph():
     workflow.add_conditional_edges(
         START,
         initiate_expert_query,
-        ["expert_query_node"],   # allowed targets
+        ["expert_query_node"],  # allowed targets
     )
 
     workflow.add_edge("expert_query_node", END)

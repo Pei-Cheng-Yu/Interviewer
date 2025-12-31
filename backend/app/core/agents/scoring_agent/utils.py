@@ -1,8 +1,6 @@
-
 from __future__ import annotations
 
-from app.core.schema import Problem, Reference_answer
-
+from app.core.schema import Problem, ReferenceAnswer
 
 
 def _row_to_problem(row) -> Problem:
@@ -13,7 +11,7 @@ def _row_to_problem(row) -> Problem:
     ref = None
     if row.reference_data:
         try:
-            ref = Reference_answer.model_validate(row.reference_data)  # Pydantic v2
+            ref = ReferenceAnswer.model_validate(row.reference_data)  # Pydantic v2
         except Exception:
             ref = None
 

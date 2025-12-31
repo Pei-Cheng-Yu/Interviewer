@@ -1,17 +1,14 @@
-from app.core.state import ScoringState
-from app.core.schema import Problem, Grade
-from pydantic import BaseModel, Field
-from typing import Annotated, List, Literal, Optional
-from typing_extensions import TypedDict
-import operator
-from app.core.llm import get_llm
-from app.core.agents.scoring_agent.prompt import SCORING_SYSTEM_PROMPT
 from app.core.agents.scoring_agent.config import SCORING_CRITERIA
-from langgraph.graph import END
-from app.core.store import InterviewStore
-from app.db.session import AsyncSessionLocal
+from app.core.agents.scoring_agent.prompt import SCORING_SYSTEM_PROMPT
+from app.core.llm import get_llm
+from app.core.schema import Grade
+from app.core.state import ScoringState
 from app.db.repositories.interview_repo import InterviewRepo
+from app.db.session import AsyncSessionLocal
+from pydantic import BaseModel, Field
+
 from .utils import _row_to_problem
+
 
 class Score(BaseModel):
     score: int = Field(..., description="1-10 score")
@@ -22,7 +19,6 @@ class SummaryFeedback(BaseModel):
     feedback: str
 
 
-   
 async def pick_target_node(state: ScoringState) -> ScoringState:
     """
     Load the next answered-but-ungraded interaction from DB,
@@ -75,7 +71,9 @@ async def accuracy_score_node(state: ScoringState):
 
     formatted_prompt = SCORING_SYSTEM_PROMPT.format(
         question=problem.content,
-        reference_answer=problem.reference_answer.model_dump() if problem.reference_answer else None,
+        reference_answer=(
+            problem.reference_answer.model_dump() if problem.reference_answer else None
+        ),
         candidate_answer=problem.candidate_response,
         criteria_name=criteria["name"],
         criteria_definition=criteria["definition"],
@@ -97,7 +95,9 @@ async def communication_score_node(state: ScoringState):
 
     formatted_prompt = SCORING_SYSTEM_PROMPT.format(
         question=problem.content,
-        reference_answer=problem.reference_answer.model_dump() if problem.reference_answer else None,
+        reference_answer=(
+            problem.reference_answer.model_dump() if problem.reference_answer else None
+        ),
         candidate_answer=problem.candidate_response,
         criteria_name=criteria["name"],
         criteria_definition=criteria["definition"],
@@ -119,7 +119,9 @@ async def completeness_score_node(state: ScoringState):
 
     formatted_prompt = SCORING_SYSTEM_PROMPT.format(
         question=problem.content,
-        reference_answer=problem.reference_answer.model_dump() if problem.reference_answer else None,
+        reference_answer=(
+            problem.reference_answer.model_dump() if problem.reference_answer else None
+        ),
         candidate_answer=problem.candidate_response,
         criteria_name=criteria["name"],
         criteria_definition=criteria["definition"],
@@ -173,6 +175,7 @@ Feedback items:
 # Optional: loop router
 # -----------------------------
 
+
 def loop_or_end_router(state: ScoringState):
     """
     If you want to score ALL available answers in one run:
@@ -180,3 +183,43 @@ def loop_or_end_router(state: ScoringState):
     Otherwise, just END in your graph wiring.
     """
     return "pick_target_node"
+
+
+async def maybe_complete_session_node(state: ScoringState):
+    session_id = state["session_id"]
+
+    async with AsyncSessionLocal() as db:
+        repo = InterviewRepo(db)
+
+        sess = await repo.get_session(session_id)  # must include max_index + status
+        if sess.status != "active":
+            return {}
+
+        max_index = sess.max_index  # onboarding stored it
+        print(f"now the max index is {max_index}")
+        if max_index is None:
+            return {}
+
+        # all required questions exist?
+        total = await repo.count_interactions(session_id)
+        print(f"now the total qeustion  is {total}")
+        if total < (max_index + 1):
+            return {}
+
+        # all required questions answered?
+        unanswered = await repo.count_unanswered_upto(session_id, max_index)
+        print(f"now unanswered is: {unanswered}")
+        if unanswered > 0:
+            return {}
+
+        # no answered-but-ungraded remaining?
+        ungraded = await repo.count_ungraded_answered(session_id)
+        print(f"now ungraded: {ungraded}")
+        if ungraded > 0:
+            return {}
+
+        print("It session mark as completed")
+        await repo.set_session_status(session_id, "completed")
+        await db.commit()
+
+    return {}
