@@ -1,4 +1,11 @@
-import api from ".";
+import api, { API_BASE } from ".";
+
+// --- helper: make relative -> absolute ---
+const abs = (u) => {
+  if (!u) return null;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  return `${API_BASE}${u}`;
+};
 
 // POST /interviews
 export async function createInterview({ rawJd, rawResume, resumeFile }) {
@@ -31,13 +38,24 @@ export async function submitAnswer({ sessionId, answerAudioBlob, answerText }) {
   return res.data;
 }
 
-// GET /interviews (you need backend)
+// ✅ NEW: audio stream URL builder
+// Backend streaming endpoint: GET /interviews/:id/audio/:orderIndex
+export function getQuestionAudioUrl(sessionId, orderIndex) {
+  return `${API_BASE}/interviews/${sessionId}/audio/${orderIndex}`;
+}
+
+// ✅ NEW: convert question_audio_url from backend (relative) to absolute
+export function normalizeAudioUrl(questionAudioUrl) {
+  return abs(questionAudioUrl);
+}
+
+// GET /interviews
 export async function listSessions() {
   const res = await api.get("/interviews");
   return res.data;
 }
 
-// GET /interviews/:id/review (you need backend)
+// GET /interviews/:id/review
 export async function getReview(sessionId) {
   const res = await api.get(`/interviews/${sessionId}/review`);
   return res.data;

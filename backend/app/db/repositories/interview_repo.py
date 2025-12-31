@@ -372,3 +372,15 @@ class InterviewRepo:
             .order_by(InterviewInteraction.order_index.asc())
         )
         return (await self.db.execute(q)).scalars().all()
+
+    async def get_interaction_by_index(self, session_id: str, order_index: int):
+        stmt = (
+            select(InterviewInteraction)
+            .where(
+                InterviewInteraction.session_id == session_id,
+                InterviewInteraction.order_index == order_index,
+            )
+            .limit(1)
+        )
+        res = await self.db.execute(stmt)
+        return res.scalar_one_or_none()

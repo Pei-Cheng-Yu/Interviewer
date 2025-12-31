@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, AsyncIterator, Literal, Optional
 
 import anyio
 import httpx
@@ -32,6 +32,8 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from fastapi.responses import StreamingResponse
+from google.cloud import storage
 from gtts import gTTS
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel
@@ -130,11 +132,31 @@ INTERVIEWER_APP = build_interviewer_graph(checkpointer=_CHECKPOINTER)
 
 SCORING_APP = build_scoring_graph()
 HARD_APP = build_hard_question_graph()
-
+GCP_PROJECT_ID = os.environ["GCP_PROJECT_ID"]
 
 # -----------------------------
 # Helpers
 # -----------------------------
+GCS_BUCKET = os.environ["GCS_BUCKET"]
+
+
+def upload_mp3_bytes_to_gcs(mp3_bytes: bytes, object_name: str) -> str:
+    client = storage.Client(project=GCP_PROJECT_ID)
+    bucket = client.bucket(GCS_BUCKET)
+    blob = bucket.blob(object_name)
+
+    blob.upload_from_string(
+        mp3_bytes, content_type="audio/mpeg"
+    )  # upload from memory :contentReference[oaicite:2]{index=2}
+
+    # return a signed URL (private bucket, frontend can still fetch/play)
+    return blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=30),
+        method="GET",
+    )
+
+
 async def _read_upload_as_text(file: UploadFile) -> str:
     content = await file.read()
     return content.decode("utf-8", errors="ignore")
@@ -240,10 +262,8 @@ async def _elevenlabs_tts_to_url(
 
         audio_bytes = resp.content
 
-    fname = f"tts_{session_id}_{order_index}_{uuid.uuid4().hex}.mp3"
-    out_path = INTERVIEW_MEDIA_DIR / fname
-    out_path.write_bytes(audio_bytes)
-    return _public_media_url(out_path)
+    object_name = f"interviews/{session_id}/tts_{order_index}_{uuid.uuid4().hex}.mp3"
+    return upload_mp3_bytes_to_gcs(audio_bytes, object_name)
 
 
 def _detect_completed(out: dict[str, Any], last_text: str) -> bool:
@@ -342,6 +362,42 @@ async def _run_background_once(session_id: str) -> None:
         {"session_id": session_id},
         config={"configurable": {"thread_id": f"{session_id}:hard"}},
     )
+
+
+def _question_stream_url(session_id: str, order_index: int) -> str:
+    # Stable URL that frontend can put into <audio src="...">
+    return f"/api/interviews/{session_id}/audio/{order_index}"
+
+
+async def _elevenlabs_stream(text: str) -> AsyncIterator[bytes]:
+    """
+    Streams audio bytes from ElevenLabs.
+    """
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(
+            status_code=500, detail="ELEVENLABS_API_KEY is not configured"
+        )
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Empty text")
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+    headers = {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "accept": "audio/mpeg",
+        "content-type": "application/json",
+    }
+    payload = {"text": text, "model_id": ELEVENLABS_MODEL_ID}
+
+    async with httpx.AsyncClient(timeout=None) as client:
+        async with client.stream("POST", url, headers=headers, json=payload) as resp:
+            if resp.status_code >= 400:
+                body = await resp.aread()
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"ElevenLabs TTS failed: {resp.status_code} {body[:300].decode(errors='ignore')}",
+                )
+            async for chunk in resp.aiter_bytes():
+                yield chunk
 
 
 # -----------------------------
@@ -515,7 +571,6 @@ async def start_interview(session_id: str, user: User = Depends(get_current_user
 
         row = await repo.next_unanswered(session_id)
 
-        # no question yet -> waiting (background may create more)
         if not row:
             return StartResponse(
                 status="waiting",
@@ -523,19 +578,11 @@ async def start_interview(session_id: str, user: User = Depends(get_current_user
                 question_audio_url=None,
             )
 
-        # if already has audio_url, just return it (polling safe)
-        if row.audio_url:
-            return StartResponse(
-                status="in_progress",
-                question_text=row.question_content,
-                question_audio_url=row.audio_url,
-            )
+        # ✅ STREAMING URL (no file generation)
+        audio_url = _question_stream_url(session_id, row.order_index)
 
-        # generate once
-        audio_url = await _elevenlabs_tts_to_url(
-            row.question_content, session_id=session_id, order_index=row.order_index
-        )
-        if audio_url:
+        # optional: store for polling-safe
+        if row.audio_url != audio_url:
             row.audio_url = audio_url
             await db.commit()
 
@@ -561,7 +608,7 @@ async def submit_answer(
             status_code=400, detail="answer_text transcript is required"
         )
 
-    # 1) save answer to the CURRENT asked question (audio_url != null, unanswered)
+    # 1) save answer to current asked question
     async with AsyncSessionLocal() as db:
         repo = InterviewRepo(db)
         await repo.assert_session_owner(session_id, user.id)
@@ -598,21 +645,17 @@ async def submit_answer(
 
         row = await repo.next_unanswered(session_id)
 
-        # completion logic based on onboarding max_index
         max_idx = getattr(sess, "max_index", None)
         if row is None:
             if max_idx is not None:
-                # ✅ must ensure 0..max_idx all exist (no gaps)
                 covered = await repo.count_interactions(session_id)
                 if covered < (max_idx + 1):
-                    # still generating / missing rows
                     return AnswerResponse(
                         status="waiting",
                         question_text="Generating next question...",
                         question_audio_url=None,
                     )
 
-                # ✅ now safe to check unanswered
                 unanswered = await repo.count_unanswered_upto(session_id, max_idx)
                 if unanswered == 0:
                     await repo.set_session_status(session_id, "completed")
@@ -626,19 +669,44 @@ async def submit_answer(
                 question_text="Generating next question...",
                 question_audio_url=None,
             )
-        # ensure audio url exists (polling safe)
-        if not row.audio_url:
-            audio_url = await _elevenlabs_tts_to_url(
-                row.question_content, session_id=session_id, order_index=row.order_index
-            )
-            if audio_url:
-                row.audio_url = audio_url
-                await db.commit()
-        else:
-            audio_url = row.audio_url
+
+        # ✅ STREAMING URL (no file generation)
+        audio_url = _question_stream_url(session_id, row.order_index)
+
+        # optional: store for polling-safe
+        if row.audio_url != audio_url:
+            row.audio_url = audio_url
+            await db.commit()
 
         return AnswerResponse(
             status="in_progress",
             question_text=row.question_content,
             question_audio_url=audio_url,
         )
+
+
+@router.get("/{session_id}/audio/{order_index}")
+async def stream_question_audio(
+    session_id: str,
+    order_index: int,
+    user: User = Depends(get_current_user),
+):
+    """
+    Browser hits this endpoint via <audio src="...">.
+    We fetch question text from DB and stream ElevenLabs bytes to client.
+    """
+    async with AsyncSessionLocal() as db:
+        repo = InterviewRepo(db)
+        await repo.assert_session_owner(session_id, user.id)
+
+        row = await repo.get_interaction_by_index(session_id, order_index)
+        if not row or not row.question_content:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        text = row.question_content
+
+    return StreamingResponse(
+        _elevenlabs_stream(text),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-store"},
+    )
