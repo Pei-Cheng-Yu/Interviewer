@@ -39,6 +39,7 @@ export default function InterviewPage() {
     setBusy(true);
     try {
       const res = await api.post(`/interviews/${id}/start`);
+      console.log("START res", res.data);
       setQuestion(res.data.question);
       speak(res.data.question);
     } finally {

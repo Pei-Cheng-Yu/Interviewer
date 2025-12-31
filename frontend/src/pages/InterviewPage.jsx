@@ -6,7 +6,11 @@ import React, {
   useState,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { startInterview, submitAnswer } from "../api/interviews";
+import {
+  startInterview,
+  submitAnswer,
+  normalizeAudioUrl,
+} from "../api/interviews";
 
 function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -117,11 +121,9 @@ export default function InterviewPage() {
     if (!el) return;
 
     el.pause();
-    el.src = questionAudioUrl;
+    el.src = questionAudioUrl; // already absolute now
     el.load();
-    el.play().catch(() => {
-      // ignore autoplay restrictions
-    });
+    el.play().catch(() => {});
   }, [questionAudioUrl]);
 
   // cleanup object url on unmount
@@ -264,7 +266,7 @@ export default function InterviewPage() {
 
       // If backend is still generating, show waiting UI (poll effect will kick in)
       setQuestionText(res.question_text || "");
-      setQuestionAudioUrl(res.question_audio_url || null);
+      setQuestionAudioUrl(normalizeAudioUrl(res.question_audio_url));
 
       clearPending();
       setTranscript("");
@@ -313,7 +315,12 @@ export default function InterviewPage() {
         </div>
 
         <div className="row">
-          <audio ref={audioRef} controls className="audio" />
+          <audio
+            ref={audioRef}
+            controls
+            className="audio"
+            crossOrigin="use-credentials"
+          />
           {!questionAudioUrl && (
             <span className="hint">
               {isWaiting ? "Waiting for audio…" : "No audio url returned"}
