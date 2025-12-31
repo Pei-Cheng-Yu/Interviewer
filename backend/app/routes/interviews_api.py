@@ -532,7 +532,7 @@ async def start_interview(session_id: str, user: User = Depends(get_current_user
             )
 
         # generate once
-        audio_url = await _gtts_to_url(
+        audio_url = await _elevenlabs_tts_to_url(
             row.question_content, session_id=session_id, order_index=row.order_index
         )
         if audio_url:
@@ -628,7 +628,7 @@ async def submit_answer(
             )
         # ensure audio url exists (polling safe)
         if not row.audio_url:
-            audio_url = await _gtts_to_url(
+            audio_url = await _elevenlabs_tts_to_url(
                 row.question_content, session_id=session_id, order_index=row.order_index
             )
             if audio_url:
